@@ -3,8 +3,8 @@
 -r requirements.txt
 
 pytest==9.1.1
+playwright>=1.40.0
+pytest-playwright>=0.4.0
 
-# The analysis engine, from the repository that actually contains it. The name
-# `falsegreen` on PyPI is an unrelated project by a different author, so it must
-# never be installed by bare name. See the note in the Dockerfile.
+# The analysis engine, from the repository that actually contains it.
 falsegreen @ git+https://github.com/Prasad-PingFederate/falsegreen@90013e44b203cd6a10495db73b7378a2b7d48b2a

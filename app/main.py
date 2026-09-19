@@ -232,6 +232,67 @@ def api_scan(owner: str, name: str):
     )
 
 
+@app.get("/api/scan/{owner}/{name}/sarif")
+def api_scan_sarif(owner: str, name: str):
+    record = store.get_scan(f"{owner}/{name}")
+    if not record:
+        return JSONResponse({"error": "not scanned yet"}, status_code=404)
+
+    payload = record.get("payload", {})
+    findings = payload.get("findings", [])
+
+    rules = {}
+    sarif_results = []
+    for f in findings:
+        rule_id = f.get("rule", "unknown")
+        rules.setdefault(
+            rule_id,
+            {
+                "id": rule_id,
+                "name": rule_id.replace("-", " ").title().replace(" ", ""),
+                "shortDescription": {"text": f.get("title", rule_id)},
+                "fullDescription": {"text": f.get("explanation", "")},
+                "defaultConfiguration": {
+                    "level": "error" if f.get("severity") in ("critical", "high") else "warning"
+                },
+            },
+        )
+        sarif_results.append({
+            "ruleId": rule_id,
+            "level": "error" if f.get("severity") in ("critical", "high") else "warning",
+            "message": {"text": f"{f.get('title', '')} in {f.get('test', '')}. {f.get('detail', '')}".strip()},
+            "locations": [
+                {
+                    "physicalLocation": {
+                        "artifactLocation": {"uri": f.get("file", "")},
+                        "region": {
+                            "startLine": max(1, f.get("line", 1)),
+                            **({"snippet": {"text": f["snippet"]}} if f.get("snippet") else {}),
+                        },
+                    }
+                }
+            ],
+        })
+
+    sarif_data = {
+        "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+        "version": "2.1.0",
+        "runs": [
+            {
+                "tool": {
+                    "driver": {
+                        "name": "falsegreen",
+                        "informationUri": "https://github.com/Prasad-PingFederate/falsegreen",
+                        "rules": list(rules.values()),
+                    }
+                },
+                "results": sarif_results,
+            }
+        ],
+    }
+    return JSONResponse(content=sarif_data, media_type="application/sarif+json")
+
+
 @app.post("/waitlist")
 def waitlist(request: Request, email: str = Form(...), repo_slug: str = Form("")):
     address = (email or "").strip().lower()
