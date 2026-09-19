@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}Developer Documentation - falsegreen{% endblock %}
+
+{% block content %}
+<main class="section">
+  <div class="section-header">
+    <h2>Developer Integration Documentation</h2>
+    <p>Everything you need to run Falsegreen locally, in CI pipelines, and with GitHub Actions.</p>
+  </div>
+
+  <div style="max-width: 900px; margin: 0 auto;">
+    <article class="feature-card" style="margin-bottom: 2rem;">
+      <h3>1. CLI Quickstart Installation</h3>
+      <p>Install the Falsegreen CLI locally via pip:</p>
+      <pre class="code-preview">pip install falsegreen
+falsegreen .                          # scan current directory
+falsegreen tests/ --fail-under 90     # fail CI if Trust Score drops below 90%
+falsegreen . --format sarif -o report.sarif # export OASIS SARIF v2.1.0</pre>
+    </article>
+
+    <article class="feature-card" id="github-action" style="margin-bottom: 2rem;">
+      <h3>2. GitHub Actions CI/CD Integration</h3>
+      <p>Add Falsegreen to your repository workflow (<code>.github/workflows/falsegreen.yml</code>):</p>
+      <pre class="code-preview">name: Falsegreen Test Trust Gate
+
+on: [push, pull_request]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install falsegreen
+      - name: Run Falsegreen Trust Audit
+        run: falsegreen . --fail-under 90 --github-annotations</pre>
+    </article>
+
+    <article class="feature-card" id="sarif" style="margin-bottom: 2rem;">
+      <h3>3. GitHub Code Scanning (SARIF Import)</h3>
+      <p>Upload findings directly to GitHub Security alerts tab:</p>
+      <pre class="code-preview">- name: Generate SARIF Security Report
+  run: falsegreen . --format sarif --output results.sarif
+
+- name: Upload SARIF to GitHub Code Scanning
+  uses: github/codeql-action/upload-sarif@v3
+  with:
+    sarif_file: results.sarif</pre>
+    </article>
+
+    <article class="feature-card" id="pre-commit">
+      <h3>4. REST API Reference</h3>
+      <p>Integrate with Falsegreen hosted web scanner programmatically:</p>
+      <pre class="code-preview"># JSON Report:
+GET https://falsegreen.fly.dev/api/scan/{owner}/{repo}
+
+# SARIF v2.1.0 Report:
+GET https://falsegreen.fly.dev/api/scan/{owner}/{repo}/sarif
+
+# SVG Trust Badge:
+GET https://falsegreen.fly.dev/badge/{owner}/{repo}.svg</pre>
+    </article>
+  </div>
+</main>
+{% endblock %}

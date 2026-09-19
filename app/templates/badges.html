@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Trust Score Badge Builder - falsegreen{% endblock %}
+
+{% block content %}
+<main class="section">
+  <div class="section-header">
+    <h2>Dynamic Trust Score Badge Builder</h2>
+    <p>Showcase your repository's test verification integrity in your GitHub README.</p>
+  </div>
+
+  <div class="report-container" style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 2.5rem;">
+    <div style="max-width: 600px; margin: 0 auto;">
+      <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">GitHub Repository Slug</label>
+      <input type="text" id="badge-repo-input" class="scan-input" style="width: 100%; margin-bottom: 1.5rem;"
+             value="Prasad-PingFederate/falsegreen" placeholder="owner/repo" oninput="updateBadgePreview()">
+
+      <div style="text-align: center; margin: 2rem 0; padding: 2rem; background: var(--bg-card); border-radius: var(--radius-md);">
+        <p style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 1rem;">LIVE BADGE PREVIEW</p>
+        <img id="live-badge-preview" src="/badge/Prasad-PingFederate/falsegreen.svg" alt="Trust Score" height="28">
+      </div>
+
+      <div class="badge-input-group" style="margin-bottom: 1.5rem;">
+        <label for="badge-md-code" style="font-weight: 600; display: block; margin-bottom: 0.5rem;">Markdown Embed Code</label>
+        <div style="display: flex; gap: 0.5rem;">
+          <input id="badge-md-code" type="text" class="scan-input" readonly onclick="this.select()">
+          <button type="button" class="btn-copy-badge" onclick="copyBadge('badge-md-code', this)">Copy Markdown</button>
+        </div>
+      </div>
+
+      <div class="badge-input-group">
+        <label for="badge-html-code" style="font-weight: 600; display: block; margin-bottom: 0.5rem;">HTML Embed Code</label>
+        <div style="display: flex; gap: 0.5rem;">
+          <input id="badge-html-code" type="text" class="scan-input" readonly onclick="this.select()">
+          <button type="button" class="btn-copy-badge" onclick="copyBadge('badge-html-code', this)">Copy HTML</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+function updateBadgePreview() {
+  const slug = document.getElementById("badge-repo-input").value.trim() || "owner/repo";
+  const badgeUrl = `${window.location.origin}/badge/${slug}.svg`;
+  const reportUrl = `${window.location.origin}/r/${slug}`;
+
+  document.getElementById("live-badge-preview").src = `/badge/${slug}.svg`;
+  document.getElementById("badge-md-code").value = `[![Trust Score](${badgeUrl})](${reportUrl})`;
+  document.getElementById("badge-html-code").value = `<a href="${reportUrl}"><img src="${badgeUrl}" alt="Trust Score"></a>`;
+}
+
+function copyBadge(id, btn) {
+  const input = document.getElementById(id);
+  input.select();
+  navigator.clipboard.writeText(input.value).then(function() {
+    const orig = btn.innerText;
+    btn.innerText = "✓ Copied!";
+    setTimeout(() => { btn.innerText = orig; }, 2000);
+  });
+}
+
+document.addEventListener("DOMContentLoaded", updateBadgePreview);
+</script>
+{% endblock %}

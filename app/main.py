@@ -312,3 +312,70 @@ def waitlist(request: Request, email: str = Form(...), repo_slug: str = Form("")
 @app.get("/health")
 def health():
     return {"status": "ok", "waitlist": store.waitlist_size(), **store.stats()}
+
+
+@app.get("/playground", response_class=HTMLResponse)
+def playground(request: Request):
+    return templates.TemplateResponse("playground.html", {"request": request, "public_url": PUBLIC_URL})
+
+
+@app.get("/rules", response_class=HTMLResponse)
+def rules_page(request: Request):
+    return templates.TemplateResponse("rules.html", {"request": request, "public_url": PUBLIC_URL})
+
+
+@app.get("/badges", response_class=HTMLResponse)
+def badges_page(request: Request):
+    return templates.TemplateResponse("badges.html", {"request": request, "public_url": PUBLIC_URL})
+
+
+@app.get("/pricing", response_class=HTMLResponse)
+def pricing_page(request: Request):
+    return templates.TemplateResponse("pricing.html", {"request": request, "public_url": PUBLIC_URL})
+
+
+@app.get("/docs", response_class=HTMLResponse)
+def docs_page(request: Request):
+    return templates.TemplateResponse("docs.html", {"request": request, "public_url": PUBLIC_URL})
+
+
+@app.post("/api/analyze-snippet")
+async def analyze_snippet(request: Request):
+    import tempfile
+    from falsegreen.models import ScanResult
+    from falsegreen.detectors.python_ast import scan_python_file
+
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"ok": False, "error": "Invalid JSON body"}, status_code=400)
+
+    code = body.get("code", "")
+    if not code.strip():
+        return JSONResponse({"ok": True, "findings": []})
+
+    with tempfile.NamedTemporaryFile(suffix=".py", mode="w", delete=False, encoding="utf-8") as tf:
+        tf.write(code)
+        tf_path = Path(tf.name)
+
+    try:
+        res = ScanResult(root=tf_path.parent)
+        scan_python_file(tf_path, res)
+        findings_data = [
+            {
+                "rule": f.rule.value,
+                "title": f.title,
+                "severity": f.severity.value,
+                "line": f.line,
+                "detail": f.detail,
+                "snippet": f.snippet,
+                "suggested_fix": f.suggested_fix,
+                "explanation": f.explanation,
+            }
+            for f in res.findings
+        ]
+        return JSONResponse({"ok": True, "findings": findings_data})
+    finally:
+        if tf_path.exists():
+            tf_path.unlink()
+

@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}Interactive Playground - falsegreen{% endblock %}
+
+{% block content %}
+<main class="section">
+  <div class="section-header" style="margin-bottom: 1.5rem;">
+    <h2>Interactive AST Code Playground</h2>
+    <p>Paste your test code below or choose a sample to see how falsegreen analyzes AST structures in real-time.</p>
+  </div>
+
+  <div class="playground-layout">
+    <div class="editor-pane">
+      <div class="pane-header">
+        <span>Test Code Editor</span>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+          <select id="sample-picker" style="background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-subtle); padding: 0.25rem 0.5rem; border-radius: var(--radius-sm); font-size: 0.8rem; font-family: var(--font-sans);" onchange="loadSample(this.value)">
+            <option value="mock_typo">Sample: Mock Assertion Typo</option>
+            <option value="unawaited_playwright">Sample: Unawaited Playwright</option>
+            <option value="constant_trap">Sample: Constant OR Trap</option>
+            <option value="swallowed_assert">Sample: Swallowed Exception</option>
+            <option value="ignored_predicate">Sample: Ignored Predicate Call</option>
+          </select>
+          <button type="button" class="btn-scan" style="font-size: 0.85rem; padding: 0.35rem 1rem;" onclick="analyzeCode()">Analyze Code</button>
+        </div>
+      </div>
+      <textarea id="code-input" class="code-textarea" spellcheck="false">
+def test_user_authentication():
+    mock_auth.assert_called_once
+    assert response.status_code == 200 or 201
+</textarea>
+    </div>
+
+    <div class="results-pane">
+      <div class="pane-header">
+        <span>Detection Results & Remediation</span>
+        <span id="result-status" style="font-size: 0.8rem; color: var(--accent-green);">Ready</span>
+      </div>
+      <div id="results-content" class="results-content">
+        <div style="text-align: center; color: var(--text-dim); margin-top: 5rem;">
+          <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">⚡</div>
+          <p>Click <b>Analyze Code</b> to run Falsegreen's AST inspection on your snippet.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+const SAMPLES = {
+  mock_typo: `def test_user_authentication():\n    # Typo: property access without () never executes!\n    mock_auth.assert_called_once\n    assert response.status_code == 200 or 201`,
+  unawaited_playwright: `async def test_dashboard_flow(page):\n    # Unawaited Playwright call passes silently without navigating\n    page.goto("https://app.example.com")\n    assert True is True`,
+  constant_trap: `def test_api_response():\n    # Truthy number 201 makes condition unconditionally True\n    assert response.status_code == 200 or 201`,
+  swallowed_assert: `def test_payment_processing():\n    try:\n        assert payment.is_authorized()\n    except Exception:\n        pass # Assertion failure swallowed!`,
+  ignored_predicate: `def test_modal_dialog(page):\n    # Predicate helper called as standalone statement without assert\n    page.is_visible("#confirm-modal")\n    assert 1 == 1`
+};
+
+function loadSample(key) {
+  if (SAMPLES[key]) {
+    document.getElementById("code-input").value = SAMPLES[key];
+    analyzeCode();
+  }
+}
+
+function analyzeCode() {
+  const code = document.getElementById("code-input").value;
+  const statusEl = document.getElementById("result-status");
+  const container = document.getElementById("results-content");
+
+  statusEl.innerText = "Analyzing...";
+  statusEl.style.color = "var(--accent-cyan)";
+
+  fetch("/api/analyze-snippet", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code: code, language: "python" })
+  })
+  .then(res => res.json())
+  .then(data => {
+    statusEl.innerText = `${data.findings.length} issue(s) detected`;
+    statusEl.style.color = data.findings.length > 0 ? "var(--sev-crit)" : "var(--accent-green)";
+
+    if (data.findings.length === 0) {
+      container.innerHTML = `
+        <div style="text-align: center; color: var(--accent-green); margin-top: 5rem;">
+          <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">✅</div>
+          <h3>Clean Test Structure!</h3>
+          <p style="color: var(--text-muted); font-size: 0.9rem;">No false-green test patterns detected in this snippet.</p>
+        </div>`;
+      return;
+    }
+
+    let html = "";
+    data.findings.forEach(f => {
+      html += `
+        <div class="finding-card sev-border-${f.severity}" style="margin-bottom: 1rem; padding: 1.25rem;">
+          <div class="finding-header">
+            <span class="sev-badge ${f.severity}">${f.severity}</span>
+            <strong style="color: var(--text-main);">${f.title}</strong>
+          </div>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">Line ${f.line}: ${f.detail}</p>
+          ${f.snippet ? `<pre class="code-preview" style="margin-bottom: 0.5rem;">${f.snippet}</pre>` : ''}
+          ${f.suggested_fix ? `
+            <div class="suggested-fix-box">
+              <div class="suggested-fix-header">
+                <span>💡 Suggested Remediation</span>
+              </div>
+              <pre style="font-family: var(--font-mono); font-size: 0.85rem; color: var(--accent-green);">${f.suggested_fix}</pre>
+            </div>` : ''}
+          <p style="font-size: 0.8rem; color: var(--text-dim); margin-top: 0.5rem;">${f.explanation}</p>
+        </div>`;
+    });
+    container.innerHTML = html;
+  })
+  .catch(err => {
+    statusEl.innerText = "Error";
+    container.innerHTML = `<div style="color: var(--sev-crit); padding: 1rem;">Failed to analyze snippet: ${err}</div>`;
+  });
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+  analyzeCode();
+});
+</script>
+{% endblock %}
