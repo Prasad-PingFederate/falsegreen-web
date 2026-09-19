@@ -40,9 +40,15 @@ from falsegreen.cli import (
     JAVA_EXTENSIONS,
     JS_EXTENSIONS,
     ROBOT_EXTENSIONS,
+    CSHARP_EXTENSIONS,
+    GO_EXTENSIONS,
+    KOTLIN_EXTENSIONS,
 )
+from falsegreen.detectors.csharp import scan_csharp_file
+from falsegreen.detectors.golang import scan_golang_file
 from falsegreen.detectors.java import scan_java_file
 from falsegreen.detectors.javascript import scan_js_file
+from falsegreen.detectors.kotlin import scan_kotlin_file
 from falsegreen.detectors.python_ast import scan_python_file
 from falsegreen.detectors.robot import scan_robot_file
 from falsegreen.models import ScanResult
@@ -293,6 +299,12 @@ def analyze(files: list[Path], root: Path) -> ScanResult:
             scan_java_file(path, result)
         elif path.suffix in JS_EXTENSIONS:
             scan_js_file(path, result)
+        elif path.suffix in CSHARP_EXTENSIONS:
+            scan_csharp_file(path, result)
+        elif path.suffix in GO_EXTENSIONS:
+            scan_golang_file(path, result)
+        elif path.suffix in KOTLIN_EXTENSIONS:
+            scan_kotlin_file(path, result)
         else:
             scan_python_file(path, result)
 
