@@ -1,125 +1,264 @@
 {% extends "base.html" %}
 
-{% block title %}Interactive Playground - falsegreen{% endblock %}
+{% block title %}Interactive AST Playground - falsegreen{% endblock %}
 
 {% block content %}
-<main class="section">
-  <div class="section-header" style="margin-bottom: 1.5rem;">
-    <h2>Interactive AST Code Playground</h2>
-    <p>Paste your test code below or choose a sample to see how falsegreen analyzes AST structures in real-time.</p>
-  </div>
-
-  <div class="playground-layout">
-    <div class="editor-pane">
-      <div class="pane-header">
-        <span>Test Code Editor</span>
-        <div style="display: flex; gap: 0.5rem; align-items: center;">
-          <select id="sample-picker" style="background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-subtle); padding: 0.25rem 0.5rem; border-radius: var(--radius-sm); font-size: 0.8rem; font-family: var(--font-sans);" onchange="loadSample(this.value)">
-            <option value="mock_typo">Sample: Mock Assertion Typo</option>
-            <option value="unawaited_playwright">Sample: Unawaited Playwright</option>
-            <option value="constant_trap">Sample: Constant OR Trap</option>
-            <option value="swallowed_assert">Sample: Swallowed Exception</option>
-            <option value="ignored_predicate">Sample: Ignored Predicate Call</option>
-          </select>
-          <button type="button" class="btn-scan" style="font-size: 0.85rem; padding: 0.35rem 1rem;" onclick="analyzeCode()">Analyze Code</button>
-        </div>
-      </div>
-      <textarea id="code-input" class="code-textarea" spellcheck="false">
-def test_user_authentication():
-    mock_auth.assert_called_once
-    assert response.status_code == 200 or 201
-</textarea>
+<div class="playground-layout">
+  <div class="playground-header">
+    <div>
+      <h1 class="page-title">Interactive AST Detector Playground</h1>
+      <p class="hero-sub" style="margin-top: 0.25rem;">
+        Paste any test code or choose an enterprise sample (Python, JS/TS, Java, C#, Go, Kotlin, Robot) to see real-time anti-pattern detection and AST inspection.
+      </p>
     </div>
-
-    <div class="results-pane">
-      <div class="pane-header">
-        <span>Detection Results & Remediation</span>
-        <span id="result-status" style="font-size: 0.8rem; color: var(--accent-green);">Ready</span>
-      </div>
-      <div id="results-content" class="results-content">
-        <div style="text-align: center; color: var(--text-dim); margin-top: 5rem;">
-          <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">⚡</div>
-          <p>Click <b>Analyze Code</b> to run Falsegreen's AST inspection on your snippet.</p>
-        </div>
-      </div>
+    <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+      <select id="langSelect" class="form-input" style="padding: 0.45rem 0.9rem; font-size: 0.85rem; width: auto; font-weight: 600;">
+        <option value="csharp">C# (.NET / NUnit / xUnit / FluentAssertions)</option>
+        <option value="golang">Go (testing.T / Testify)</option>
+        <option value="kotlin">Kotlin (JUnit / Kotest / MockK)</option>
+        <option value="python">Python (pytest / unittest)</option>
+        <option value="javascript">JavaScript / TypeScript (Playwright / Jest)</option>
+        <option value="java">Java (JUnit / TestNG / Selenium)</option>
+        <option value="robot">Robot Framework</option>
+      </select>
+      <button id="runBtn" class="btn btn-primary" style="padding: 0.5rem 1.25rem; font-size: 0.9rem;">
+        <span>&#9654;</span> Analyze Code
+      </button>
     </div>
   </div>
-</main>
+
+  <!-- Presets -->
+  <div style="display: flex; gap: 0.5rem; margin-bottom: 1.25rem; flex-wrap: wrap; align-items: center;">
+    <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Presets:</span>
+    <button class="badge preset-chip" data-lang="csharp" data-snippet="csharp_swallowed" style="cursor: pointer; border: 1px solid var(--border);">C# Swallowed Try/Catch</button>
+    <button class="badge preset-chip" data-lang="csharp" data-snippet="csharp_dangling" style="cursor: pointer; border: 1px solid var(--border);">C# Dangling .Should()</button>
+    <button class="badge preset-chip" data-lang="golang" data-snippet="go_no_assert" style="cursor: pointer; border: 1px solid var(--border);">Go Missing Assertions</button>
+    <button class="badge preset-chip" data-lang="kotlin" data-snippet="kotlin_tautology" style="cursor: pointer; border: 1px solid var(--border);">Kotlin Kotest Tautology</button>
+    <button class="badge preset-chip" data-lang="python" data-snippet="py_unawaited" style="cursor: pointer; border: 1px solid var(--border);">Python Unawaited Coroutine</button>
+    <button class="badge preset-chip" data-lang="javascript" data-snippet="js_dangling" style="cursor: pointer; border: 1px solid var(--border);">Playwright Dangling Expect</button>
+  </div>
+
+  <div class="playground-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+    <!-- Editor Pane -->
+    <div class="editor-pane" style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column;">
+      <div style="padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); background: var(--bg-card-subtle); display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted); font-family: monospace;">Source Code Input</span>
+        <button id="clearBtn" class="btn" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; background: transparent; color: var(--text-muted);">Clear</button>
+      </div>
+      <textarea id="code-input" spellcheck="false" style="flex: 1; min-height: 400px; padding: 1rem; font-family: 'JetBrains Mono', Consolas, monospace; font-size: 0.88rem; line-height: 1.5; background: var(--bg-dark); color: #f8fafc; border: none; outline: none; resize: vertical;" placeholder="Paste test code here..."></textarea>
+    </div>
+
+    <!-- Live Analysis Pane -->
+    <div class="analysis-pane" style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column;">
+      <div style="padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); background: var(--bg-card-subtle); display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted); font-family: monospace;">Live Detector Feedback</span>
+        <span id="statusBadge" class="badge badge-success" style="font-size: 0.75rem;">Ready</span>
+      </div>
+      <div id="results-content" style="flex: 1; padding: 1rem; overflow-y: auto; max-height: 400px;">
+        <div id="emptyState" style="text-align: center; padding: 3rem 1rem; color: var(--text-muted);">
+          <div style="font-size: 2rem; margin-bottom: 0.5rem;">&#128269;</div>
+          <div style="font-weight: 600; margin-bottom: 0.25rem;">No analysis executed yet</div>
+          <div style="font-size: 0.82rem;">Click "Analyze Code" or select a preset above.</div>
+        </div>
+        <div id="findingsList" style="display: none; display: flex; flex-direction: column; gap: 0.75rem;"></div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script>
 const SAMPLES = {
-  mock_typo: `def test_user_authentication():\n    # Typo: property access without () never executes!\n    mock_auth.assert_called_once\n    assert response.status_code == 200 or 201`,
-  unawaited_playwright: `async def test_dashboard_flow(page):\n    # Unawaited Playwright call passes silently without navigating\n    page.goto("https://app.example.com")\n    assert True is True`,
-  constant_trap: `def test_api_response():\n    # Truthy number 201 makes condition unconditionally True\n    assert response.status_code == 200 or 201`,
-  swallowed_assert: `def test_payment_processing():\n    try:\n        assert payment.is_authorized()\n    except Exception:\n        pass # Assertion failure swallowed!`,
-  ignored_predicate: `def test_modal_dialog(page):\n    # Predicate helper called as standalone statement without assert\n    page.is_visible("#confirm-modal")\n    assert 1 == 1`
+  csharp_swallowed: {
+    lang: 'csharp',
+    code: `using NUnit.Framework;
+using System;
+
+[TestFixture]
+public class PaymentTests {
+    [Test]
+    public void ProcessPayment_HandlesTimeout() {
+        try {
+            var client = new PaymentClient();
+            var res = client.Charge(50.0);
+            Assert.That(res.IsSuccess, Is.True);
+        } catch (Exception ex) {
+            // Swallowed! Test passes green even if assertion fails
+        }
+    }
+}`
+  },
+  csharp_dangling: {
+    lang: 'csharp',
+    code: `using Xunit;
+using FluentAssertions;
+
+public class OrderTests {
+    [Fact]
+    public void VerifyCartTotal() {
+        var cart = new ShoppingCart();
+        cart.Add("Item1", 20);
+        
+        // Dangling .Should() with no matcher attached!
+        cart.Total.Should();
+    }
+}`
+  },
+  go_no_assert: {
+    lang: 'golang',
+    code: `package auth_test
+
+import "testing"
+
+func TestUserLogin(t *testing.T) {
+    client := NewClient()
+    token, err := client.Login("admin", "secret")
+    // Missing require.NoError(t, err) and t.Fatal(err)!
+    _ = token
+}`
+  },
+  kotlin_tautology: {
+    lang: 'kotlin',
+    code: `import io.kotest.core.spec.style.FunSpec
+import io.kotest.matchers.shouldBe
+
+class AuthSpec : FunSpec({
+    test("token generation") {
+        Thread.sleep(1000)
+        true shouldBe true // Tautological Kotest assertion!
+    }
+})`
+  },
+  py_unawaited: {
+    lang: 'python',
+    code: `import pytest
+from playwright.async_api import Page
+
+@pytest.mark.asyncio
+async def test_dashboard(page: Page):
+    # Unawaited async coroutine call:
+    page.goto("https://app.example.com")
+    page.click("#login-btn")
+    assert True`
+  },
+  js_dangling: {
+    lang: 'javascript',
+    code: `import { test, expect } from '@playwright/test';
+
+test('settings save', async ({ page }) => {
+    await page.goto('/settings');
+    await page.fill('#username', 'alice');
+    await page.click('#save');
+    
+    // Dangling expect: never calls a matcher!
+    expect(page.locator('.toast'));
+});`
+  }
 };
 
-function loadSample(key) {
-  if (SAMPLES[key]) {
-    document.getElementById("code-input").value = SAMPLES[key];
-    analyzeCode();
-  }
-}
+const codeInput = document.getElementById('code-input');
+const langSelect = document.getElementById('langSelect');
+const runBtn = document.getElementById('runBtn');
+const clearBtn = document.getElementById('clearBtn');
+const emptyState = document.getElementById('emptyState');
+const findingsList = document.getElementById('findingsList');
+const statusBadge = document.getElementById('statusBadge');
 
-function analyzeCode() {
-  const code = document.getElementById("code-input").value;
-  const statusEl = document.getElementById("result-status");
-  const container = document.getElementById("results-content");
+// Set default
+codeInput.value = SAMPLES.csharp_swallowed.code;
+langSelect.value = 'csharp';
 
-  statusEl.innerText = "Analyzing...";
-  statusEl.style.color = "var(--accent-cyan)";
+document.querySelectorAll('.preset-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    const key = chip.dataset.snippet;
+    if (SAMPLES[key]) {
+      codeInput.value = SAMPLES[key].code;
+      langSelect.value = SAMPLES[key].lang;
+      runAnalysis();
+    }
+  });
+});
 
-  fetch("/api/analyze-snippet", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ code: code, language: "python" })
-  })
-  .then(res => res.json())
-  .then(data => {
-    statusEl.innerText = `${data.findings.length} issue(s) detected`;
-    statusEl.style.color = data.findings.length > 0 ? "var(--sev-crit)" : "var(--accent-green)";
+clearBtn.addEventListener('click', () => {
+  codeInput.value = '';
+  findingsList.innerHTML = '';
+  findingsList.style.display = 'none';
+  emptyState.style.display = 'block';
+  statusBadge.textContent = 'Cleared';
+  statusBadge.className = 'badge';
+});
 
-    if (data.findings.length === 0) {
-      container.innerHTML = `
-        <div style="text-align: center; color: var(--accent-green); margin-top: 5rem;">
-          <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">✅</div>
-          <h3>Clean Test Structure!</h3>
-          <p style="color: var(--text-muted); font-size: 0.9rem;">No false-green test patterns detected in this snippet.</p>
-        </div>`;
+async function runAnalysis() {
+  const code = codeInput.value;
+  const lang = langSelect.value;
+  if (!code.trim()) return;
+
+  statusBadge.textContent = 'Analyzing...';
+  statusBadge.className = 'badge badge-warning';
+
+  try {
+    const resp = await fetch('/api/analyze-snippet', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, lang })
+    });
+    const data = await resp.json();
+
+    if (!data.ok) {
+      statusBadge.textContent = 'Error';
+      statusBadge.className = 'badge badge-danger';
+      alert(data.error || 'Analysis failed');
       return;
     }
 
-    let html = "";
-    data.findings.forEach(f => {
-      html += `
-        <div class="finding-card sev-border-${f.severity}" style="margin-bottom: 1rem; padding: 1.25rem;">
-          <div class="finding-header">
-            <span class="sev-badge ${f.severity}">${f.severity}</span>
-            <strong style="color: var(--text-main);">${f.title}</strong>
-          </div>
-          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">Line ${f.line}: ${f.detail}</p>
-          ${f.snippet ? `<pre class="code-preview" style="margin-bottom: 0.5rem;">${f.snippet}</pre>` : ''}
-          ${f.suggested_fix ? `
-            <div class="suggested-fix-box">
-              <div class="suggested-fix-header">
-                <span>💡 Suggested Remediation</span>
-              </div>
-              <pre style="font-family: var(--font-mono); font-size: 0.85rem; color: var(--accent-green);">${f.suggested_fix}</pre>
-            </div>` : ''}
-          <p style="font-size: 0.8rem; color: var(--text-dim); margin-top: 0.5rem;">${f.explanation}</p>
-        </div>`;
+    const findings = data.findings || [];
+    emptyState.style.display = 'none';
+    findingsList.style.display = 'flex';
+    findingsList.innerHTML = '';
+
+    if (findings.length === 0) {
+      statusBadge.textContent = '100% Clean';
+      statusBadge.className = 'badge badge-success';
+      findingsList.innerHTML = `
+        <div style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 8px; padding: 1.5rem; text-align: center;">
+          <div style="font-weight: 700; color: #4ade80; margin-bottom: 0.25rem;">&#10004; Zero Anti-Patterns Detected</div>
+          <div style="font-size: 0.85rem; color: var(--text-muted);">This test contains effective assertions with no swallowed errors or tautologies.</div>
+        </div>
+      `;
+      return;
+    }
+
+    statusBadge.textContent = `${findings.length} Issue${findings.length > 1 ? 's' : ''} Found`;
+    statusBadge.className = 'badge badge-danger';
+
+    findings.forEach(f => {
+      const card = document.createElement('div');
+      card.className = 'finding-card';
+      card.style.background = 'var(--bg-dark)';
+      card.style.border = '1px solid var(--border)';
+      card.style.borderRadius = '8px';
+      card.style.padding = '0.9rem';
+
+      const sevClass = f.severity === 'critical' ? 'badge-danger' : f.severity === 'high' ? 'badge-warning' : 'badge-info';
+      card.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.4rem;">
+          <span style="font-weight: 700; font-size: 0.9rem;">${f.title}</span>
+          <span class="badge ${sevClass}" style="text-transform: uppercase; font-size: 0.7rem;">${f.severity}</span>
+        </div>
+        <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.5rem;">${f.detail}</p>
+        ${f.snippet ? `<pre style="background: #000; padding: 0.5rem; border-radius: 6px; font-size: 0.78rem; overflow-x: auto; color: #fca5a5; margin-bottom: 0.5rem;"><code>${f.snippet}</code></pre>` : ''}
+        ${f.suggested_fix ? `<div style="font-size: 0.78rem; color: #4ade80; background: rgba(34,197,94,0.1); padding: 0.4rem 0.6rem; border-radius: 4px;"><strong>Suggested Fix:</strong> ${f.suggested_fix}</div>` : ''}
+      `;
+      findingsList.appendChild(card);
     });
-    container.innerHTML = html;
-  })
-  .catch(err => {
-    statusEl.innerText = "Error";
-    container.innerHTML = `<div style="color: var(--sev-crit); padding: 1rem;">Failed to analyze snippet: ${err}</div>`;
-  });
+  } catch (err) {
+    statusBadge.textContent = 'Failed';
+    statusBadge.className = 'badge badge-danger';
+    console.error(err);
+  }
 }
 
-document.addEventListener("DOMContentLoaded", function() {
-  analyzeCode();
-});
+runBtn.addEventListener('click', runAnalysis);
+// Run default analysis on load
+runAnalysis();
 </script>
 {% endblock %}

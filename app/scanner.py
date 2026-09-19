@@ -41,6 +41,33 @@ from falsegreen.cli import (
     JS_EXTENSIONS,
     ROBOT_EXTENSIONS,
 )
+
+try:
+    from falsegreen.cli import (
+        CSHARP_EXTENSIONS,
+        GO_EXTENSIONS,
+        KOTLIN_EXTENSIONS,
+    )
+except ImportError:
+    CSHARP_EXTENSIONS = {".cs"}
+    GO_EXTENSIONS = {".go"}
+    KOTLIN_EXTENSIONS = {".kt", ".kts"}
+
+try:
+    from falsegreen.detectors.csharp import scan_csharp_file
+except ImportError:
+    scan_csharp_file = None
+
+try:
+    from falsegreen.detectors.golang import scan_golang_file
+except ImportError:
+    scan_golang_file = None
+
+try:
+    from falsegreen.detectors.kotlin import scan_kotlin_file
+except ImportError:
+    scan_kotlin_file = None
+
 from falsegreen.detectors.java import scan_java_file
 from falsegreen.detectors.javascript import scan_js_file
 from falsegreen.detectors.python_ast import scan_python_file
@@ -293,6 +320,12 @@ def analyze(files: list[Path], root: Path) -> ScanResult:
             scan_java_file(path, result)
         elif path.suffix in JS_EXTENSIONS:
             scan_js_file(path, result)
+        elif path.suffix in CSHARP_EXTENSIONS and scan_csharp_file is not None:
+            scan_csharp_file(path, result)
+        elif path.suffix in GO_EXTENSIONS and scan_golang_file is not None:
+            scan_golang_file(path, result)
+        elif path.suffix in KOTLIN_EXTENSIONS and scan_kotlin_file is not None:
+            scan_kotlin_file(path, result)
         else:
             scan_python_file(path, result)
 

@@ -344,6 +344,12 @@ async def analyze_snippet(request: Request):
     import tempfile
     from falsegreen.models import ScanResult
     from falsegreen.detectors.python_ast import scan_python_file
+    from falsegreen.detectors.javascript import scan_js_file
+    from falsegreen.detectors.java import scan_java_file
+    from falsegreen.detectors.csharp import scan_csharp_file
+    from falsegreen.detectors.golang import scan_golang_file
+    from falsegreen.detectors.kotlin import scan_kotlin_file
+    from falsegreen.detectors.robot import scan_robot_file
 
     try:
         body = await request.json()
@@ -351,16 +357,33 @@ async def analyze_snippet(request: Request):
         return JSONResponse({"ok": False, "error": "Invalid JSON body"}, status_code=400)
 
     code = body.get("code", "")
+    lang = (body.get("lang") or "python").lower()
+
     if not code.strip():
         return JSONResponse({"ok": True, "findings": []})
 
-    with tempfile.NamedTemporaryFile(suffix=".py", mode="w", delete=False, encoding="utf-8") as tf:
+    ext_map = {
+        "python": (".py", scan_python_file),
+        "javascript": (".js", scan_js_file),
+        "typescript": (".ts", scan_js_file),
+        "java": (".java", scan_java_file),
+        "csharp": (".cs", scan_csharp_file),
+        "c#": (".cs", scan_csharp_file),
+        "golang": (".go", scan_golang_file),
+        "go": (".go", scan_golang_file),
+        "kotlin": (".kt", scan_kotlin_file),
+        "robot": (".robot", scan_robot_file),
+    }
+
+    suffix, scanner_fn = ext_map.get(lang, (".py", scan_python_file))
+
+    with tempfile.NamedTemporaryFile(suffix=suffix, mode="w", delete=False, encoding="utf-8") as tf:
         tf.write(code)
         tf_path = Path(tf.name)
 
     try:
         res = ScanResult(root=tf_path.parent)
-        scan_python_file(tf_path, res)
+        scanner_fn(tf_path, res)
         findings_data = [
             {
                 "rule": f.rule.value,
