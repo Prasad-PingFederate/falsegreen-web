@@ -5,6 +5,18 @@ on:
     branches: [ main, pre-dev, feat/*, fix/* ]
   pull_request:
     branches: [ main, pre-dev ]
+  workflow_dispatch:
+    inputs:
+      test_path:
+        description: 'Test file or path to run (e.g. tests/, tests/test_playwright_e2e.py)'
+        required: false
+        default: 'tests/'
+        type: string
+      pytest_args:
+        description: 'Additional pytest options (e.g. -k test_name, -m marker)'
+        required: false
+        default: ''
+        type: string
 
 jobs:
   test:
@@ -35,7 +47,9 @@ jobs:
         env:
           PYTHONPATH: .
         run: |
-          pytest -v tests/ --junitxml=test-results.xml
+          TEST_PATH="${{ inputs.test_path || 'tests/' }}"
+          EXTRA_ARGS="${{ inputs.pytest_args || '' }}"
+          pytest -v $TEST_PATH $EXTRA_ARGS --junitxml=test-results.xml
 
       - name: Publish Test Summary to GitHub Actions
         if: always()
