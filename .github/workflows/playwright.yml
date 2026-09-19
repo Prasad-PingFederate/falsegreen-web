@@ -35,7 +35,12 @@ jobs:
         env:
           PYTHONPATH: .
         run: |
-          pytest -v tests/
+          pytest -v tests/ --junitxml=test-results.xml
+
+      - name: Publish Test Summary to GitHub Actions
+        if: always()
+        run: |
+          python scripts/generate_ci_summary.py test-results.xml
 
       - name: Upload Test Artifacts on Failure
         if: failure()
