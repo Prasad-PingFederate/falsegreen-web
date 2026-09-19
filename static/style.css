@@ -236,6 +236,23 @@ h2 { font-size: 1.35rem; letter-spacing: -.02em; margin: 0 0 22px; }
 .stat-row span { color: var(--muted); font-size: .8rem; }
 .bad-stat b { color: var(--crit); }
 
+/* A score computed over part of a suite is a partial score, and the report has
+   to say so rather than letting a smaller "files" number pass unnoticed. Amber
+   not red: the scan succeeded, its coverage is simply narrower than the repo. */
+.coverage-warning {
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: rgba(210,153,34,.1);
+  border: 1px solid rgba(210,153,34,.35);
+  border-radius: var(--radius);
+  color: #f0d08a;
+  font-size: .9rem;
+  line-height: 1.5;
+}
+.coverage-warning b { color: var(--high); }
+.coverage-warning ul { margin: 8px 0 0; padding-left: 18px; }
+.coverage-warning li { margin: 3px 0; font-family: var(--mono); font-size: .82rem; }
+
 table { width: 100%; border-collapse: collapse; font-size: .9rem; }
 th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--border); }
 th { color: var(--muted); font-weight: 600; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; }

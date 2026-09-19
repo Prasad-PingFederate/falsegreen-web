@@ -1,0 +1,10 @@
+# Test-only dependencies. Kept out of requirements.txt so the runtime image
+# stays minimal - the Dockerfile installs that file, not this one.
+-r requirements.txt
+
+pytest==9.1.1
+
+# The analysis engine, from the repository that actually contains it. The name
+# `falsegreen` on PyPI is an unrelated project by a different author, so it must
+# never be installed by bare name. See the note in the Dockerfile.
+falsegreen @ git+https://github.com/Prasad-PingFederate/falsegreen@efed24bd89e4ecc8bd9f34042581987de03dcc90

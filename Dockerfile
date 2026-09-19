@@ -10,9 +10,17 @@ WORKDIR /srv
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# The analysis engine. Published separately on PyPI; pinned here so a bad
-# release upstream cannot silently change what the service reports.
-RUN pip install --no-cache-dir "falsegreen==0.1.0"
+# The analysis engine, installed from the repository that actually contains it
+# and pinned to an exact commit.
+#
+# Deliberately NOT from PyPI. The name `falsegreen` on PyPI belongs to an
+# unrelated project by a different author (github.com/vinicq/falsegreen); its
+# package ships scanner.py and hook_install.py and has no cli, detectors,
+# models or score modules. `pip install falsegreen==0.1.0` therefore installed
+# a stranger's code into this image while providing none of the imports
+# app/scanner.py needs - the container could not have started. A commit SHA is
+# used rather than a tag or branch because only the SHA is immutable.
+RUN pip install --no-cache-dir     "falsegreen @ git+https://github.com/Prasad-PingFederate/falsegreen@efed24bd89e4ecc8bd9f34042581987de03dcc90"
 
 COPY app ./app
 COPY static ./static

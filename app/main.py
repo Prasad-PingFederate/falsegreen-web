@@ -74,6 +74,12 @@ def _payload_from(report: ScanReport) -> dict:
         "tests_can_fail": report.score.trustworthy,
         "tests_cannot_fail": result.untrustworthy_tests,
         "files_scanned": result.files_scanned,
+        # What the scan could not account for. A Trust Score that quietly
+        # covered fewer files than it found would be the same false green this
+        # product exists to expose, so the shortfall travels with the score.
+        "files_found": report.files_found,
+        "files_skipped": report.files_skipped,
+        "errors": list(result.errors),
         "counts": {s.value: len(result.by_severity(s)) for s in Severity},
         "by_rule": sorted(by_rule.values(), key=lambda r: -r["count"]),
         "findings": [

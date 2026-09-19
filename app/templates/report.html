@@ -25,7 +25,29 @@
       <div><b>{{ data.tests_can_fail }}</b><span>can fail</span></div>
       <div class="bad-stat"><b>{{ data.tests_cannot_fail }}</b><span>cannot fail</span></div>
       <div><b>{{ data.files_scanned }}</b><span>files</span></div>
+      {% if data.files_skipped %}
+      <div class="bad-stat"><b>{{ data.files_skipped }}</b><span>not scanned</span></div>
+      {% endif %}
     </div>
+
+    {# A score computed over part of a suite describes only that part. Saying so
+       out loud is this tool's own premise applied to its own output. #}
+    {% if data.files_skipped %}
+    <div class="coverage-warning">
+      <b>This score does not cover the whole suite.</b>
+      {{ data.files_skipped }} of {{ data.files_found }} test
+      file{{ '' if data.files_found == 1 else 's' }} could not be analyzed, so
+      the tests inside them were neither trusted nor blamed.
+      {% if data.errors %}
+      <ul>
+        {% for err in data.errors[:5] %}<li>{{ err }}</li>{% endfor %}
+        {% if data.errors|length > 5 %}
+        <li>and {{ data.errors|length - 5 }} more</li>
+        {% endif %}
+      </ul>
+      {% endif %}
+    </div>
+    {% endif %}
   </section>
 
   {% if data.by_rule %}

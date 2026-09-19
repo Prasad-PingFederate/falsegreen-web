@@ -68,6 +68,18 @@ class ScanReport:
     result: ScanResult
     score: Score
 
+    #: Test files collect_files matched, before any were scanned. Kept next to
+    #: result.files_scanned so the two can be compared: a Trust Score computed
+    #: over fewer files than were found is not wrong so much as unqualified,
+    #: and the gap has to reach the user rather than being averaged away.
+    files_found: int = 0
+
+    #: Files matched but never analyzed - truncated past MAX_TEST_FILES, or
+    #: failed to parse. Each one is a test whose trustworthiness is unknown.
+    @property
+    def files_skipped(self) -> int:
+        return max(0, self.files_found - self.result.files_scanned)
+
     @property
     def url(self) -> str:
         return f"https://github.com/{self.owner}/{self.repo}"
@@ -243,6 +255,37 @@ def _checked_out_mb(path: Path) -> float:
     return total / (1024 * 1024)
 
 
+def analyze(files: list[Path], root: Path) -> ScanResult:
+    """Parse each collected test file with the analyzer for its language.
+
+    Separate from scan_repository so the dispatch can be exercised without a
+    network round trip. That separation is the point: the bug this replaced -
+    JavaScript tests falling into the Python parser, raising SyntaxError and
+    vanishing into result.errors - survived precisely because nothing tested
+    this logic on its own.
+    """
+    result = ScanResult(root=root)
+
+    if len(files) > MAX_TEST_FILES:
+        # Truncating is a legitimate judgement about cost, but it narrows what
+        # the score describes, so it is recorded like any other skipped file
+        # rather than applied invisibly.
+        result.errors.append(
+            f"Only the first {MAX_TEST_FILES} of {len(files)} test files were "
+            f"scanned. Run the CLI locally for the whole suite: pip install falsegreen"
+        )
+        files = files[:MAX_TEST_FILES]
+
+    for path in files:
+        # Dispatch on extension, exactly as cli.py does.
+        if path.suffix in JS_EXTENSIONS:
+            scan_js_file(path, result)
+        else:
+            scan_python_file(path, result)
+
+    return result
+
+
 def scan_repository(raw_url: str) -> ScanReport:
     owner, repo = parse_repo(raw_url)
     workdir = Path(tempfile.mkdtemp(prefix="fg-"))
@@ -268,20 +311,8 @@ def scan_repository(raw_url: str) -> ScanReport:
                 "under e2e/ and __tests__/."
             )
 
-        if len(files) > MAX_TEST_FILES:
-            files = files[:MAX_TEST_FILES]
-
-        result = ScanResult(root=checkout)
-        for path in files:
-            # Dispatch on extension, exactly as the CLI does. Sending a .ts file
-            # to the Python analyzer does not fail loudly: ast.parse raises
-            # SyntaxError, the file is recorded in result.errors and
-            # files_scanned is never incremented - so every JavaScript test
-            # silently disappears from the score instead of being judged.
-            if path.suffix in JS_EXTENSIONS:
-                scan_js_file(path, result)
-            else:
-                scan_python_file(path, result)
+        files_found = len(files)
+        result = analyze(files, checkout)
 
         return ScanReport(
             owner=owner,
@@ -289,6 +320,7 @@ def scan_repository(raw_url: str) -> ScanReport:
             slug=f"{owner}/{repo}",
             result=result,
             score=compute(result),
+            files_found=files_found,
         )
     finally:
         shutil.rmtree(workdir, ignore_errors=True)
