@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}Rules Directory - falsegreen{% endblock %}
+
+{% block content %}
+<main class="section">
+  <div class="section-header">
+    <h2>Anti-Pattern Detection Rules</h2>
+    <p>Explore the complete encyclopedia of test patterns that cause suites to pass falsely.</p>
+  </div>
+
+  <div style="display: flex; gap: 1rem; justify-content: center; margin-bottom: 2.5rem; flex-wrap: wrap;">
+    <button type="button" class="sample-chip active" style="font-size: 0.9rem; padding: 0.4rem 1rem;" onclick="filterRuleCards('all', this)">All Rules (20)</button>
+    <button type="button" class="sample-chip" style="font-size: 0.9rem; padding: 0.4rem 1rem;" onclick="filterRuleCards('python', this)">Python & Pytest</button>
+    <button type="button" class="sample-chip" style="font-size: 0.9rem; padding: 0.4rem 1rem;" onclick="filterRuleCards('javascript', this)">JavaScript & Playwright</button>
+    <button type="button" class="sample-chip" style="font-size: 0.9rem; padding: 0.4rem 1rem;" onclick="filterRuleCards('java', this)">Java & JUnit</button>
+    <button type="button" class="sample-chip" style="font-size: 0.9rem; padding: 0.4rem 1rem;" onclick="filterRuleCards('robot', this)">Robot Framework</button>
+  </div>
+
+  <div class="feature-grid" id="rules-grid">
+    <div class="feature-card rule-card" data-lang="python">
+      <div class="finding-header">
+        <span class="sev-badge critical">Critical</span>
+        <span style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-dim);">mock-assertion-typo</span>
+      </div>
+      <h3>Mock Assertion Typo</h3>
+      <p>Bare property access or misspelled assertion method on a Mock instance (e.g. <code>mock.assert_called_once</code> without <code>()</code>).</p>
+      <div class="code-preview">
+<span style="color: #ef4444;">- mock.assert_called_once</span>
+<span style="color: #10b981;">+ mock.assert_called_once()</span>
+      </div>
+    </div>
+
+    <div class="feature-card rule-card" data-lang="javascript">
+      <div class="finding-header">
+        <span class="sev-badge high">High</span>
+        <span style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-dim);">unawaited-expect</span>
+      </div>
+      <h3>Unawaited Playwright Expect</h3>
+      <p>In Playwright JS/TS, async matchers like <code>expect(locator).toBeVisible()</code> return a Promise. Without <code>await</code>, test finishes before matcher executes.</p>
+      <div class="code-preview">
+<span style="color: #ef4444;">- expect(page.locator("h1")).toBeVisible()</span>
+<span style="color: #10b981;">+ await expect(page.locator("h1")).toBeVisible()</span>
+      </div>
+    </div>
+
+    <div class="feature-card rule-card" data-lang="python">
+      <div class="finding-header">
+        <span class="sev-badge high">High</span>
+        <span style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-dim);">unawaited-async-call</span>
+      </div>
+      <h3>Unawaited Coroutine Action</h3>
+      <p>Calling async Playwright actions (<code>page.click()</code>, <code>page.goto()</code>) without <code>await</code> in async tests creates unexecuted coroutines.</p>
+      <div class="code-preview">
+<span style="color: #ef4444;">- page.click("button#submit")</span>
+<span style="color: #10b981;">+ await page.click("button#submit")</span>
+      </div>
+    </div>
+
+    <div class="feature-card rule-card" data-lang="python">
+      <div class="finding-header">
+        <span class="sev-badge critical">Critical</span>
+        <span style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-dim);">constant-condition-trap</span>
+      </div>
+      <h3>Constant Condition Trap</h3>
+      <p>Using <code>assert a == 200 or 201</code> evaluates to <code>201</code> (truthy integer), making the assertion unconditionally pass regardless of <code>a</code>.</p>
+      <div class="code-preview">
+<span style="color: #ef4444;">- assert status == 200 or 201</span>
+<span style="color: #10b981;">+ assert status in (200, 201)</span>
+      </div>
+    </div>
+
+    <div class="feature-card rule-card" data-lang="python">
+      <div class="finding-header">
+        <span class="sev-badge critical">Critical</span>
+        <span style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-dim);">swallowed-assertion</span>
+      </div>
+      <h3>Swallowed Assertion Exception</h3>
+      <p>An assertion is contained in a <code>try: ... except:</code> block that catches <code>AssertionError</code> or <code>Exception</code> without re-raising.</p>
+      <div class="code-preview">
+<span style="color: #ef4444;">try: assert user.is_active</span>
+<span style="color: #ef4444;">except Exception: pass</span>
+      </div>
+    </div>
+
+    <div class="feature-card rule-card" data-lang="java">
+      <div class="finding-header">
+        <span class="sev-badge high">High</span>
+        <span style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-dim);">assertion-free-helper</span>
+      </div>
+      <h3>Assertion-Free Test Method</h3>
+      <p>A test method executes application driver code but contains zero assertions or verification steps.</p>
+      <div class="code-preview">
+<span style="color: #ef4444;">@Test void testLogin() { driver.get(url); }</span>
+<span style="color: #10b981;">@Test void testLogin() { assertEquals("Home", title); }</span>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+function filterRuleCards(lang, btn) {
+  document.querySelectorAll(".sample-chip").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+
+  const cards = document.querySelectorAll(".rule-card");
+  cards.forEach(card => {
+    if (lang === "all" || card.getAttribute("data-lang") === lang) {
+      card.style.display = "flex";
+    } else {
+      card.style.display = "none";
+    }
+  });
+}
+</script>
+{% endblock %}

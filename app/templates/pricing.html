@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Pricing & Plans - falsegreen{% endblock %}
+
+{% block content %}
+<main class="section">
+  <div class="section-header">
+    <h2>Transparent, Developer-First Pricing</h2>
+    <p>Start free on public open-source repos. Upgrade for private CI enforcement and PR automation.</p>
+  </div>
+
+  <div class="pricing-grid">
+    <div class="pricing-card">
+      <h3>Community Open Source</h3>
+      <p style="color: var(--text-muted); font-size: 0.9rem;">For open-source developers and public repositories.</p>
+      <div class="price">$0 <span>/ forever</span></div>
+      <ul class="plan-features">
+        <li>✓ Unlimited public repo scans</li>
+        <li>✓ Full 20+ AST anti-pattern detectors</li>
+        <li>✓ Dynamic SVG Trust Score badges</li>
+        <li>✓ OASIS SARIF v2.1.0 exports</li>
+        <li>✓ CLI local testing</li>
+      </ul>
+      <a href="/" class="btn-scan" style="display: block; text-align: center; text-decoration: none; padding: 0.75rem;">Scan Public Repo</a>
+    </div>
+
+    <div class="pricing-card featured">
+      <div class="plan-tag">Most Popular</div>
+      <h3>Pro Team</h3>
+      <p style="color: var(--text-muted); font-size: 0.9rem;">For teams shipping production code with CI gating.</p>
+      <div class="price">$29 <span>/ month</span></div>
+      <ul class="plan-features">
+        <li>✓ Unlimited private GitHub repositories</li>
+        <li>✓ GitHub Pull Request inline code review bot</li>
+        <li>✓ Automated Trust Score trend graphs</li>
+        <li>✓ Auto-remediation PR creator</li>
+        <li>✓ Slack & Discord notification hooks</li>
+      </ul>
+      <button type="button" class="btn-scan" style="width: 100%; padding: 0.75rem;" onclick="document.getElementById('waitlist-modal').scrollIntoView({behavior: 'smooth'})">Get Pro Access</button>
+    </div>
+
+    <div class="pricing-card">
+      <h3>Enterprise</h3>
+      <p style="color: var(--text-muted); font-size: 0.9rem;">For large engineering organizations & regulated compliance.</p>
+      <div class="price">Custom</div>
+      <ul class="plan-features">
+        <li>✓ Self-hosted runner & On-prem deployment</li>
+        <li>✓ Custom company AST rule builder</li>
+        <li>✓ SSO / SAML & audit logs</li>
+        <li>✓ 99.99% uptime SLA guarantee</li>
+        <li>✓ Dedicated quality architect support</li>
+      </ul>
+      <a href="mailto:prasad.dammai94@gmail.com?subject=Falsegreen%20Enterprise%20Inquiry" class="btn-github" style="display: block; text-align: center; text-decoration: none; padding: 0.75rem; justify-content: center;">Contact Sales</a>
+    </div>
+  </div>
+
+  <div id="waitlist-modal" style="max-width: 650px; margin: 4rem auto; background: var(--bg-surface); border: 1px solid var(--border-accent); border-radius: var(--radius-lg); padding: 2.5rem; text-align: center;">
+    <h3 style="font-size: 1.5rem; margin-bottom: 0.5rem;">Join the Private Beta Waitlist</h3>
+    <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 1.5rem;">Get early access to GitHub App PR enforcement for private repositories.</p>
+
+    <form method="post" action="/waitlist" style="display: flex; gap: 0.5rem; max-width: 500px; margin: 0 auto;">
+      <input type="email" name="email" class="scan-input" placeholder="developer@company.com" required>
+      <button type="submit" class="btn-scan">Join Waitlist</button>
+    </form>
+  </div>
+</main>
+{% endblock %}
