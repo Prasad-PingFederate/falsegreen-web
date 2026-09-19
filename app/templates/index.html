@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block content %}
+<main>
+  <section class="hero">
+    <h1>Your test suite is green.<br><span class="accent">Some of those tests cannot fail.</span></h1>
+    <p class="lede">
+      A passing suite only means something if its tests were capable of going red.
+      Paste a public repo and find out how many of yours were not.
+    </p>
+
+    {% if error %}
+      <div class="alert" role="alert">{{ error }}</div>
+    {% endif %}
+
+    <form class="scan-form" method="post" action="/scan">
+      <input
+        type="text"
+        name="repo"
+        placeholder="https://github.com/owner/repo"
+        aria-label="GitHub repository URL"
+        required
+        autofocus
+        spellcheck="false"
+        autocomplete="off">
+      <button type="submit">Scan</button>
+    </form>
+
+    <p class="micro">
+      Public repos, Python test files, free. Nothing is executed &mdash; it reads the syntax tree.
+    </p>
+  </section>
+
+  <section class="demo">
+    <div class="terminal" aria-label="Example output">
+<pre>  Trust Score  <span class="bad">65/100</span>   grade D
+  <span class="dim">180 of 519 tests (35%) cannot fail.</span>
+
+  <span class="crit">CRITICAL</span> Assertion is swallowed by except
+           tests/test_vault.py:214  in <b>test_delete_record</b>
+           <span class="dim">expect(...).to_be_hidden() sits inside a try whose
+           except (line 216) catches it without re-raising</span>
+
+  <span class="crit">CRITICAL</span> Test contains no assertions
+           tests/test_account.py:70  in <b>test_change_password</b>
+           <span class="dim">no assert, no expect matcher, no pytest.raises</span></pre>
+    </div>
+    <p class="caption">
+      Real output from a production suite of 519 Playwright tests that had been
+      reporting about 460 passes a day for months.
+    </p>
+  </section>
+
+  <section class="why">
+    <h2>The ones people argue about</h2>
+
+    <div class="cards">
+      <article>
+        <h3>The assertion that guards itself</h3>
+<pre class="snippet">if is_visible(element):
+    expect(element).to_be_visible()
+else:
+    print("[WARN] not available")</pre>
+        <p>
+          Reads like a careful test. It is a tautology across two lines: the
+          assertion only runs when the element is already known present, and the
+          case where it is <em>missing</em> &mdash; the bug the test exists to catch
+          &mdash; prints a warning and passes.
+        </p>
+      </article>
+
+      <article>
+        <h3>The helper that promises</h3>
+<pre class="snippet">def assert_row_gone(row):
+    try:
+        expect(row).to_be_hidden()
+    except Exception:
+        pass</pre>
+        <p>
+          Every call site reads as verified. Nothing is verified. This one shipped
+          in a real codebase for months, and every delete test that called it
+          silently certified itself.
+        </p>
+      </article>
+
+      <article>
+        <h3>The test that only navigates</h3>
+<pre class="snippet">def test_change_password(page):
+    page.goto("/settings")
+    page.fill("#new", "hunter2")
+    page.click("#save")</pre>
+        <p>
+          Runs code, ends, passes. It can tell you the app did not crash. It cannot
+          tell you the password changed, and it will stay green after you break
+          the save handler.
+        </p>
+      </article>
+    </div>
+  </section>
+
+  {% if recent %}
+  <section class="recent">
+    <h2>Recently scanned</h2>
+    <ul class="repo-list">
+      {% for r in recent %}
+      <li>
+        <a href="/r/{{ r.slug }}">{{ r.slug }}</a>
+        <span class="score s{{ r.grade }}">{{ r.score }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% if stats.repos %}
+      <p class="micro">
+        {{ stats.repos }} repositories scanned{% if stats.avg_score is not none %},
+        average Trust Score {{ stats.avg_score }}/100{% endif %}.
+      </p>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  <section class="pricing" id="pricing">
+    <h2>Pricing</h2>
+    <div class="tiers">
+      <article class="tier">
+        <h3>CLI</h3>
+        <p class="price">Free</p>
+        <pre class="snippet">pip install falsegreen
+falsegreen .</pre>
+        <ul>
+          <li>Every rule</li>
+          <li>Any repo, public or private</li>
+          <li>No dependencies, nothing phones home</li>
+          <li>MIT licensed</li>
+        </ul>
+      </article>
+
+      <article class="tier featured">
+        <h3>Team</h3>
+        <p class="price">$19<span>/repo/month</span></p>
+        <ul>
+          <li>GitHub App: scans every pull request</li>
+          <li>Private repositories</li>
+          <li>Trust Score over time, so regressions are visible</li>
+          <li>Blocks a PR that adds a test which cannot fail</li>
+          <li>Findings inline in the diff via SARIF</li>
+        </ul>
+        <form class="waitlist" id="waitlist-form">
+          <input type="email" name="email" placeholder="you@company.com" required aria-label="Email">
+          <button type="submit">Join the waitlist</button>
+        </form>
+        <p class="micro" id="waitlist-msg"></p>
+      </article>
+    </div>
+    <p class="micro center">
+      The CLI stays free and complete. The paid tier is hosting and history, not
+      withheld rules.
+    </p>
+  </section>
+</main>
+
+<script>
+  document.getElementById('waitlist-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const msg = document.getElementById('waitlist-msg');
+    const body = new FormData(form);
+    msg.textContent = 'Sending...';
+    try {
+      const res = await fetch('/waitlist', { method: 'POST', body });
+      const data = await res.json();
+      msg.textContent = data.ok ? data.message : (data.error || 'Something went wrong.');
+      if (data.ok) form.reset();
+    } catch (err) {
+      msg.textContent = 'Network error. Try again.';
+    }
+  });
+</script>
+{% endblock %}

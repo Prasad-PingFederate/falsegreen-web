@@ -1,0 +1,37 @@
+app = "falsegreen"
+primary_region = "sin"   # Singapore - closest low-latency region to India
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PUBLIC_URL = "https://falsegreen.fly.dev"
+  SCAN_RATE_LIMIT = "10"
+  SCAN_RATE_WINDOW = "3600"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  # Scale to zero when idle. A scan takes seconds and a cold start costs about
+  # one, which is the right trade for a product with no traffic yet: idle cost
+  # is zero instead of a monthly bill for an empty machine.
+  min_machines_running = 0
+
+[[http_service.checks]]
+  grace_period = "10s"
+  interval = "30s"
+  method = "GET"
+  timeout = "5s"
+  path = "/health"
+
+# SQLite needs durable storage. Without this the database is wiped on every
+# deploy, taking the waitlist with it.
+[mounts]
+  source = "falsegreen_data"
+  destination = "/srv/data"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

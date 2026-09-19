@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}falsegreen - find tests that cannot fail{% endblock %}</title>
+  <meta name="description" content="{% block description %}A passing test suite only means something if its tests could have failed. falsegreen finds the ones that could not.{% endblock %}">
+
+  <meta property="og:title" content="{% block og_title %}falsegreen{% endblock %}">
+  <meta property="og:description" content="{% block og_description %}Find tests that cannot fail.{% endblock %}">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9888;</text></svg>">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="site-head">
+    <a class="brand" href="/">
+      <span class="brand-mark"></span>
+      <span class="brand-name">falsegreen</span>
+    </a>
+    <nav>
+      <a href="https://github.com/YOURNAME/falsegreen">GitHub</a>
+      <a href="#pricing">Pricing</a>
+    </nav>
+  </header>
+
+  {% block content %}{% endblock %}
+
+  <footer class="site-foot">
+    <p>
+      falsegreen is static analysis. It never executes the code it scans.
+      <a href="https://github.com/YOURNAME/falsegreen">Source on GitHub</a>.
+    </p>
+  </footer>
+</body>
+</html>

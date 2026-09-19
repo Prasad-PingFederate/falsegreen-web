@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block title %}{{ slug }} - Trust Score {{ data.score }}/100 - falsegreen{% endblock %}
+{% block description %}{{ data.headline }}{% endblock %}
+{% block og_title %}{{ slug }} scored {{ data.score }}/100{% endblock %}
+{% block og_description %}{{ data.headline }}{% endblock %}
+
+{% block content %}
+<main class="report">
+  <section class="verdict">
+    <p class="repo-name">
+      <a href="https://github.com/{{ slug }}">{{ slug }}</a>
+    </p>
+
+    <div class="score-block grade-{{ data.grade }}">
+      <div class="score-number">{{ data.score }}<span>/100</span></div>
+      <div class="score-grade">grade {{ data.grade }}</div>
+    </div>
+
+    <h1>{{ data.headline }}</h1>
+    <p class="lede">{{ data.detail }}</p>
+
+    <div class="stat-row">
+      <div><b>{{ data.tests_found }}</b><span>tests</span></div>
+      <div><b>{{ data.tests_can_fail }}</b><span>can fail</span></div>
+      <div class="bad-stat"><b>{{ data.tests_cannot_fail }}</b><span>cannot fail</span></div>
+      <div><b>{{ data.files_scanned }}</b><span>files</span></div>
+    </div>
+  </section>
+
+  {% if data.by_rule %}
+  <section class="breakdown">
+    <h2>What was found</h2>
+    <table>
+      <thead><tr><th>Count</th><th>Problem</th><th>Severity</th></tr></thead>
+      <tbody>
+        {% for r in data.by_rule %}
+        <tr>
+          <td class="num">{{ r.count }}</td>
+          <td>{{ r.title }}</td>
+          <td><span class="sev sev-{{ r.severity }}">{{ r.severity }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% endif %}
+
+  {% if data.findings %}
+  <section class="findings">
+    <h2>Findings</h2>
+    <p class="micro">Showing the most severe {{ data.findings|length }}. Low-severity items are omitted here; the CLI shows everything.</p>
+
+    {% for f in data.findings %}
+    <article class="finding sev-border-{{ f.severity }}">
+      <header>
+        <span class="sev sev-{{ f.severity }}">{{ f.severity }}</span>
+        <h3>{{ f.title }}</h3>
+      </header>
+      <p class="loc"><code>{{ f.file }}</code> in <b>{{ f.test }}</b></p>
+      {% if f.snippet %}<pre class="snippet">{{ f.snippet }}</pre>{% endif %}
+      {% if f.detail %}<p class="detail">{{ f.detail }}</p>{% endif %}
+      <details>
+        <summary>Why this matters</summary>
+        <p>{{ f.explanation }}</p>
+      </details>
+    </article>
+    {% endfor %}
+  </section>
+  {% else %}
+  <section class="findings">
+    <h2>Nothing found</h2>
+    <p>Every test in this repository has at least one assertion that is allowed to propagate.</p>
+  </section>
+  {% endif %}
+
+  <section class="share">
+    <h2>Add the badge</h2>
+    <p><img src="/badge/{{ slug }}.svg" alt="Trust Score {{ data.score }}/100" width="140" height="20"></p>
+
+    <label for="badge-md">Markdown</label>
+    <input id="badge-md" type="text" readonly
+      value="[![Trust Score]({{ public_url }}/badge/{{ slug }}.svg)]({{ public_url }}/r/{{ slug }})"
+      onclick="this.select()">
+
+    <p class="micro">
+      The badge updates when the repo is rescanned.
+      <a href="/r/{{ slug }}?refresh=1">Rescan now</a>.
+    </p>
+  </section>
+
+  <section class="next">
+    <h2>Fix them</h2>
+    <pre class="snippet">pip install falsegreen
+falsegreen .                  # full report, including low severity
+falsegreen . --fail-under {{ data.score }}   # lock in today's score in CI</pre>
+    <p>
+      Setting <code>--fail-under</code> to your current score breaks nothing today
+      and stops the number going down. That is the realistic way to adopt this on
+      an existing suite.
+    </p>
+  </section>
+</main>
+{% endblock %}
