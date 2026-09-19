@@ -10,8 +10,16 @@ SECURITY NOTES - read before changing anything here.
   smuggle a command.
 - Only https://github.com/owner/repo is accepted. No ssh, no file://, no
   git://, no arbitrary hosts, no submodules (they would fetch unvetted URLs).
-- Depth 1, a hard timeout, a size ceiling and a file-count ceiling, because the
-  caller controls the input and an unbounded clone is a free denial of service.
+- Depth 1, a blobless partial clone, a sparse checkout restricted to test-file
+  patterns, a hard timeout, a byte ceiling on what gets materialized and a
+  file-count ceiling, because the caller controls the input and an unbounded
+  clone is a free denial of service.
+- That byte ceiling is applied to the bytes we actually parse, never to the
+  repository's total size. The two differ by orders of magnitude on an ordinary
+  project - the repo this was rewritten for is 230 MB of TypeScript and assets
+  wrapped around 8 KB of Python tests. Gating on repository size refused a scan
+  costing milliseconds while doing nothing to bound the real work, so the bound
+  now sits on the only thing that scales the cost: bytes handed to ast.parse.
 """
 
 from __future__ import annotations
@@ -37,8 +45,14 @@ GITHUB_REPO_RE = re.compile(
 )
 
 CLONE_TIMEOUT_SECONDS = 60
-MAX_REPO_MB = 200
 MAX_TEST_FILES = 3000
+
+# Ceiling on the test files themselves - deliberately NOT on repository size.
+# Because the checkout is sparse, test files are the only thing we ever
+# download, so this one number bounds bandwidth, disk and parse time together.
+# It is generous for its purpose: 20 MB is on the order of half a million lines
+# of test code, and sits in the same range as MAX_TEST_FILES.
+MAX_TEST_MB = 20
 
 
 class ScanError(Exception):
@@ -97,19 +111,15 @@ def _clone_env() -> dict:
     return env
 
 
-def _clone(owner: str, repo: str, dest: Path) -> None:
-    url = f"https://github.com/{owner}/{repo}.git"
+def _run_git(args: list[str], doing: str) -> subprocess.CompletedProcess:
+    """Run one git command: no shell, no prompts, hard timeout.
+
+    Every git invocation in this module goes through here so that the timeout
+    and the prompt-proof environment cannot be forgotten at a new call site.
+    """
     try:
-        proc = subprocess.run(
-            [
-                "git", "clone",
-                "--depth", "1",
-                "--single-branch",
-                "--no-tags",
-                "--recurse-submodules=no",
-                "--config", "core.askPass=true",   # never prompt for credentials
-                url, str(dest),
-            ],
+        return subprocess.run(
+            ["git", *args],
             capture_output=True,
             text=True,
             timeout=CLONE_TIMEOUT_SECONDS,
@@ -118,11 +128,67 @@ def _clone(owner: str, repo: str, dest: Path) -> None:
         )
     except subprocess.TimeoutExpired:
         raise ScanError(
-            f"Cloning timed out after {CLONE_TIMEOUT_SECONDS}s. The repository is "
-            f"too large for the free scanner."
+            f"{doing} timed out after {CLONE_TIMEOUT_SECONDS}s. "
+            f"Run the CLI locally instead: pip install falsegreen"
         )
     except FileNotFoundError:
         raise ScanError("git is not available on the server.")
+
+
+def _sparse_patterns() -> list[str]:
+    """Translate falsegreen's include globs into gitignore-style sparse rules.
+
+    Derived from DEFAULT_INCLUDES rather than spelled out a second time, so the
+    set of files we download can never drift from the set collect_files will
+    later pick up. A pattern that stopped matching here would not fail loudly -
+    it would silently scan less - which is exactly the failure this tool exists
+    to catch, so the single source of truth matters.
+
+    The two dialects differ in one way that bites: a gitignore pattern
+    containing a slash is anchored to the repository root, so `tests/**/*.py`
+    alone would miss `backend/tests/test_api.py`. Emit an unanchored twin for
+    those. Patterns with no slash already match at any depth.
+    """
+    patterns: list[str] = []
+    for include in DEFAULT_INCLUDES:
+        patterns.append(include)
+        if "/" in include:
+            patterns.append(f"**/{include}")
+
+    # Never fetch vendored or generated trees, even when they contain matching
+    # files. collect_files discards them anyway; excluding them here means we
+    # do not pay to download a dependency's test suite first.
+    for excluded in DEFAULT_EXCLUDES:
+        name = excluded.strip("*/")
+        if name:
+            patterns.append(f"!**/{name}/**")
+
+    return patterns
+
+
+def _clone(owner: str, repo: str, dest: Path) -> None:
+    """Fetch the repository's shape without its contents.
+
+    `--filter=blob:none --no-checkout` downloads commits and trees only. File
+    contents are fetched later, on demand, for just the paths the sparse
+    checkout asks for - so a 230 MB repository costs about 1 MB and a second
+    here, and repository size stops being a quantity this service cares about.
+    """
+    url = f"https://github.com/{owner}/{repo}.git"
+    proc = _run_git(
+        [
+            "clone",
+            "--filter=blob:none",              # contents on demand, not up front
+            "--no-checkout",                   # choose what to materialize later
+            "--depth", "1",
+            "--single-branch",
+            "--no-tags",
+            "--recurse-submodules=no",
+            "--config", "core.askPass=true",   # never prompt for credentials
+            url, str(dest),
+        ],
+        doing="Cloning",
+    )
 
     if proc.returncode != 0:
         stderr = (proc.stderr or "").lower()
@@ -133,15 +199,45 @@ def _clone(owner: str, repo: str, dest: Path) -> None:
         raise ScanError("Could not clone that repository.")
 
 
-def _directory_mb(path: Path) -> float:
+def _checkout_tests(dest: Path) -> None:
+    """Materialize the test files, and only the test files.
+
+    This is where blobs are actually fetched, so it is bounded by the same
+    timeout as the clone.
+    """
+    proc = _run_git(
+        ["-C", str(dest), "sparse-checkout", "set", "--no-cone", *_sparse_patterns()],
+        doing="Selecting test files",
+    )
+    if proc.returncode != 0:
+        raise ScanError("Could not select the test files in that repository.")
+
+    proc = _run_git(["-C", str(dest), "checkout"], doing="Fetching test files")
+    if proc.returncode != 0:
+        raise ScanError("Could not read the test files from that repository.")
+
+
+def _checked_out_mb(path: Path) -> float:
+    """Megabytes materialized by the sparse checkout.
+
+    After a sparse checkout this is the test files and nothing else, which makes
+    it both what we downloaded and an upper bound on what ast.parse will read.
+    Skips .git, which holds the packfile rather than working-tree content.
+
+    Stops counting once past the ceiling: the caller only asks whether the limit
+    was exceeded, and the exact total beyond it is not worth the syscalls.
+    """
+    ceiling = MAX_TEST_MB * 1024 * 1024
     total = 0
     for item in path.rglob("*"):
+        if ".git" in item.parts:
+            continue
         try:
             if item.is_file() and not item.is_symlink():
                 total += item.stat().st_size
         except OSError:
             continue
-        if total > MAX_REPO_MB * 1024 * 1024:
+        if total > ceiling:
             break
     return total / (1024 * 1024)
 
@@ -153,12 +249,14 @@ def scan_repository(raw_url: str) -> ScanReport:
 
     try:
         _clone(owner, repo, checkout)
+        _checkout_tests(checkout)
 
-        size = _directory_mb(checkout)
-        if size > MAX_REPO_MB:
+        size = _checked_out_mb(checkout)
+        if size > MAX_TEST_MB:
             raise ScanError(
-                f"That repository is {size:.0f} MB, over the {MAX_REPO_MB} MB limit "
-                f"for the free scanner. Run the CLI locally instead: pip install falsegreen"
+                f"That repository's test files come to more than {MAX_TEST_MB} MB, "
+                f"over the limit for the free scanner. Run the CLI locally "
+                f"instead: pip install falsegreen"
             )
 
         files = collect_files(checkout, DEFAULT_INCLUDES, DEFAULT_EXCLUDES)
