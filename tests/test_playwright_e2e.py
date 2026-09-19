@@ -75,7 +75,7 @@ def test_report_page_findings_and_sarif_export(page: Page, server_url: str):
         "tests_found": 50,
         "tests_can_fail": 41,
         "tests_cannot_fail": 9,
-        "counts": {"critical": 2, "high": 3, "medium": 4, "low": 0},
+        "counts": {"critical": 1, "high": 1, "medium": 0, "low": 0},
         "findings": [
             {
                 "rule": "mock-assertion-typo",
@@ -102,7 +102,7 @@ def test_report_page_findings_and_sarif_export(page: Page, server_url: str):
                 "suggested_fix": "assert response.status_code in (200, 201)",
             }
         ],
-        "headline": "9 in 50 tests cannot fail.",
+        "headline": "2 in 50 tests cannot fail.",
     }
 
     store.save_scan(
@@ -131,6 +131,37 @@ def test_report_page_findings_and_sarif_export(page: Page, server_url: str):
     sarif_url = report.get_sarif_href()
     assert sarif_url is not None
     assert "/api/scan/testorg/demo-project/sarif" in sarif_url
+
+
+def test_interactive_severity_filtering(page: Page, server_url: str):
+    # Navigate to seeded report page
+    page.goto(f"{server_url}/r/testorg/demo-project")
+    page.wait_for_load_state("networkidle")
+
+    # Click Critical filter button
+    page.click('button[data-filter="critical"]')
+    critical_items = page.locator('.finding-item[data-severity="critical"]')
+    expect(critical_items.first).to_be_visible()
+
+    # Click All button to restore all items
+    page.click('button[data-filter="all"]')
+    expect(page.locator('.finding-item[data-severity="critical"]').first).to_be_visible()
+    expect(page.locator('.finding-item[data-severity="high"]').first).to_be_visible()
+
+
+def test_suggested_fix_and_badge_copy_ui(page: Page, server_url: str):
+    page.goto(f"{server_url}/r/testorg/demo-project")
+    page.wait_for_load_state("networkidle")
+
+    # Check copy fix button
+    copy_fix_btn = page.locator(".btn-copy-fix").first
+    expect(copy_fix_btn).to_be_visible()
+    assert "Copy Fix" in copy_fix_btn.inner_text()
+
+    # Check copy badge button
+    copy_badge_btn = page.locator(".btn-copy-badge")
+    expect(copy_badge_btn).to_be_visible()
+    assert "Copy Markdown" in copy_badge_btn.inner_text()
 
 
 def test_responsive_layout_matrix(page: Page, server_url: str):

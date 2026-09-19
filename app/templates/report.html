@@ -30,8 +30,6 @@
       {% endif %}
     </div>
 
-    {# A score computed over part of a suite describes only that part. Saying so
-       out loud is this tool's own premise applied to its own output. #}
     {% if data.files_skipped %}
     <div class="coverage-warning">
       <b>This score does not cover the whole suite.</b>
@@ -69,19 +67,40 @@
   {% endif %}
 
   {% if data.findings %}
-  <section class="findings">
-    <h2>Findings</h2>
-    <p class="micro">Showing the most severe {{ data.findings|length }}. Low-severity items are omitted here; the CLI shows everything.</p>
+  <section class="findings" id="findings-section">
+    <div class="findings-header-row">
+      <h2>Findings ({{ data.findings|length }})</h2>
+      <div class="filter-bar" id="filter-bar">
+        <span class="filter-label">Filter:</span>
+        <button type="button" class="filter-btn active" data-filter="all">All</button>
+        <button type="button" class="filter-btn" data-filter="critical">Critical</button>
+        <button type="button" class="filter-btn" data-filter="high">High</button>
+        <button type="button" class="filter-btn" data-filter="medium">Medium</button>
+        <button type="button" class="filter-btn" data-filter="low">Low</button>
+      </div>
+    </div>
+    <p class="micro">Showing detected false-green patterns. Use the filters above to inspect by severity.</p>
 
     {% for f in data.findings %}
-    <article class="finding sev-border-{{ f.severity }}">
+    <article class="finding finding-item sev-border-{{ f.severity }}" data-severity="{{ f.severity }}">
       <header>
         <span class="sev sev-{{ f.severity }}">{{ f.severity }}</span>
         <h3>{{ f.title }}</h3>
       </header>
-      <p class="loc"><code>{{ f.file }}</code> in <b>{{ f.test }}</b></p>
+      <p class="loc"><code>{{ f.file }}</code>{% if f.line %}:<b>{{ f.line }}</b>{% endif %} in <b>{{ f.test }}</b></p>
       {% if f.snippet %}<pre class="snippet">{{ f.snippet }}</pre>{% endif %}
       {% if f.detail %}<p class="detail">{{ f.detail }}</p>{% endif %}
+
+      {% if f.suggested_fix %}
+      <div class="suggested-fix-box">
+        <div class="suggested-fix-header">
+          <span>💡 Suggested Remediation:</span>
+          <button type="button" class="btn-copy-fix" onclick="copyFix(this, {{ f.suggested_fix|tojson }})">Copy Fix</button>
+        </div>
+        <pre class="suggested-fix-code">{{ f.suggested_fix }}</pre>
+      </div>
+      {% endif %}
+
       <details>
         <summary>Why this matters</summary>
         <p>{{ f.explanation }}</p>
@@ -100,14 +119,19 @@
     <h2>Add the badge</h2>
     <p><img src="/badge/{{ slug }}.svg" alt="Trust Score {{ data.score }}/100" width="140" height="20"></p>
 
-    <label for="badge-md">Markdown</label>
-    <input id="badge-md" type="text" readonly
-      value="[![Trust Score]({{ public_url }}/badge/{{ slug }}.svg)]({{ public_url }}/r/{{ slug }})"
-      onclick="this.select()">
+    <div class="badge-input-group">
+      <label for="badge-md">Markdown Embed Code</label>
+      <div class="input-with-button">
+        <input id="badge-md" type="text" readonly
+          value="[![Trust Score]({{ public_url }}/badge/{{ slug }}.svg)]({{ public_url }}/r/{{ slug }})"
+          onclick="this.select()">
+        <button type="button" class="btn-copy-badge" onclick="copyBadge('badge-md', this)">Copy Markdown</button>
+      </div>
+    </div>
 
     <p class="micro">
       The badge updates when the repo is rescanned.
-      <a href="/r/{{ slug }}?refresh=1">Rescan now</a> · <a href="/api/scan/{{ slug }}" target="_blank">JSON</a> · <a href="/api/scan/{{ slug }}/sarif" target="_blank" download="{{ name }}-falsegreen.sarif">Export SARIF</a>.
+      <a href="/r/{{ slug }}?refresh=1">Rescan now</a> • <a href="/api/scan/{{ slug }}" target="_blank">JSON API</a> • <a href="/api/scan/{{ slug }}/sarif" target="_blank" download="{{ name }}-falsegreen.sarif">Export SARIF 2.1.0</a>.
     </p>
   </section>
 
@@ -123,4 +147,49 @@ falsegreen . --fail-under {{ data.score }}   # lock in today's score in CI</pre>
     </p>
   </section>
 </main>
+
+<script>
+function copyFix(btn, text) {
+  navigator.clipboard.writeText(text).then(function() {
+    const originalText = btn.innerText;
+    btn.innerText = "✓ Copied!";
+    btn.classList.add("copied");
+    setTimeout(function() {
+      btn.innerText = originalText;
+      btn.classList.remove("copied");
+    }, 2000);
+  });
+}
+
+function copyBadge(inputId, btn) {
+  const input = document.getElementById(inputId);
+  input.select();
+  navigator.clipboard.writeText(input.value).then(function() {
+    const original = btn.innerText;
+    btn.innerText = "✓ Copied!";
+    setTimeout(function() { btn.innerText = original; }, 2000);
+  });
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+  const filterBtns = document.querySelectorAll(".filter-btn");
+  const items = document.querySelectorAll(".finding-item");
+
+  filterBtns.forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      filterBtns.forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      const target = btn.getAttribute("data-filter");
+
+      items.forEach(function(item) {
+        if (target === "all" || item.getAttribute("data-severity") === target) {
+          item.style.display = "";
+        } else {
+          item.style.display = "none";
+        }
+      });
+    });
+  });
+});
+</script>
 {% endblock %}
