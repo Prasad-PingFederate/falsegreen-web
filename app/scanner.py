@@ -33,7 +33,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Tuple
 
-from falsegreen.cli import collect_files, DEFAULT_EXCLUDES, DEFAULT_INCLUDES
+from falsegreen.cli import collect_files, DEFAULT_EXCLUDES, DEFAULT_INCLUDES, JS_EXTENSIONS
+from falsegreen.detectors.javascript import scan_js_file
 from falsegreen.detectors.python_ast import scan_python_file
 from falsegreen.models import ScanResult
 from falsegreen.score import Score, compute
@@ -262,8 +263,9 @@ def scan_repository(raw_url: str) -> ScanReport:
         files = collect_files(checkout, DEFAULT_INCLUDES, DEFAULT_EXCLUDES)
         if not files:
             raise ScanError(
-                "No Python test files found. falsegreen looks for test_*.py, *_test.py "
-                "and files under tests/. JavaScript support is not live yet."
+                "No test files found. falsegreen looks for test_*.py, *_test.py and "
+                "files under tests/, plus *.spec.ts, *.test.js, *.cy.ts and files "
+                "under e2e/ and __tests__/."
             )
 
         if len(files) > MAX_TEST_FILES:
@@ -271,7 +273,15 @@ def scan_repository(raw_url: str) -> ScanReport:
 
         result = ScanResult(root=checkout)
         for path in files:
-            scan_python_file(path, result)
+            # Dispatch on extension, exactly as the CLI does. Sending a .ts file
+            # to the Python analyzer does not fail loudly: ast.parse raises
+            # SyntaxError, the file is recorded in result.errors and
+            # files_scanned is never incremented - so every JavaScript test
+            # silently disappears from the score instead of being judged.
+            if path.suffix in JS_EXTENSIONS:
+                scan_js_file(path, result)
+            else:
+                scan_python_file(path, result)
 
         return ScanReport(
             owner=owner,
