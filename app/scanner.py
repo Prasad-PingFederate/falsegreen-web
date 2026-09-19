@@ -33,9 +33,18 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Tuple
 
-from falsegreen.cli import collect_files, DEFAULT_EXCLUDES, DEFAULT_INCLUDES, JS_EXTENSIONS
+from falsegreen.cli import (
+    collect_files,
+    DEFAULT_EXCLUDES,
+    DEFAULT_INCLUDES,
+    JAVA_EXTENSIONS,
+    JS_EXTENSIONS,
+    ROBOT_EXTENSIONS,
+)
+from falsegreen.detectors.java import scan_java_file
 from falsegreen.detectors.javascript import scan_js_file
 from falsegreen.detectors.python_ast import scan_python_file
+from falsegreen.detectors.robot import scan_robot_file
 from falsegreen.models import ScanResult
 from falsegreen.score import Score, compute
 
@@ -278,7 +287,11 @@ def analyze(files: list[Path], root: Path) -> ScanResult:
 
     for path in files:
         # Dispatch on extension, exactly as cli.py does.
-        if path.suffix in JS_EXTENSIONS:
+        if path.suffix in ROBOT_EXTENSIONS:
+            scan_robot_file(path, result)
+        elif path.suffix in JAVA_EXTENSIONS:
+            scan_java_file(path, result)
+        elif path.suffix in JS_EXTENSIONS:
             scan_js_file(path, result)
         else:
             scan_python_file(path, result)

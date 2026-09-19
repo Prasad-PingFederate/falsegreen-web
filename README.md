@@ -14,20 +14,20 @@ A green suite only means something if its tests were capable of going red.
 
 Twelve rules. Each one describes a test that passes without being able to fail.
 
-| Rule | What it means | Python | JS/TS |
-|---|---|:---:|:---:|
-| `no-assertions` | The test body contains no assertion at all | ✅ | ✅ |
-| `swallowed-assertion` | An assertion sits inside a `try` whose handler catches it without re-raising | ✅ | ✅ |
-| `blanket-try-except` | The whole test body is wrapped in a handler that cannot propagate | ✅ | — |
-| `tautological-assertion` | The assertion compares a value to itself, or to a literal that is always true | ✅ | ✅ |
-| `dangling-expect` | An `expect(...)` is built but no matcher is ever called on it | ✅ | ✅ |
-| `unawaited-expect` | An async `expect(...)` is never awaited, so the test finishes before it resolves | — | ✅ |
-| `assertion-free-helper` | The test delegates to a helper that itself asserts nothing | ✅ | — |
-| `sleep-instead-of-wait` | A fixed sleep stands in for a real wait condition | ✅ | ✅ |
-| `disabled-test` | The test is skipped, xfailed or otherwise never runs | ✅ | ✅ |
-| `forced-interaction` | An interaction is forced past the check that would have caught the bug | ✅ | — |
-| `self-guarded-assertion` | The assertion is inside an `if` that its own subject makes false | ✅ | ✅ |
-| `optional-assertion` | The assertion only runs on some branches, so passing proves nothing | ✅ | ✅ |
+| Rule | What it means | Python | JS/TS | Java | Robot |
+|---|---|:---:|:---:|:---:|:---:|
+| `no-assertions` | The test body contains no assertion at all | ✅ | ✅ | ✅ | ✅ |
+| `swallowed-assertion` | An assertion sits inside a `try` whose handler catches it without re-raising | ✅ | ✅ | ✅ | ✅ |
+| `blanket-try-except` | The whole test body is wrapped in a handler that cannot propagate | ✅ | — | — | — |
+| `tautological-assertion` | The assertion compares a value to itself, or to a literal that is always true | ✅ | ✅ | ✅ | ✅ |
+| `dangling-expect` | An `expect(...)` is built but no matcher is ever called on it | ✅ | ✅ | — | — |
+| `unawaited-expect` | An async `expect(...)` is never awaited, so the test finishes before it resolves | — | ✅ | — | — |
+| `assertion-free-helper` | The test delegates to a helper that itself asserts nothing | ✅ | — | ✅ | ✅ |
+| `sleep-instead-of-wait` | A fixed sleep stands in for a real wait condition | ✅ | ✅ | ✅ | ✅ |
+| `disabled-test` | The test is skipped, xfailed or otherwise never runs | ✅ | ✅ | ✅ | ✅ |
+| `forced-interaction` | An interaction is forced past the check that would have caught the bug | ✅ | — | — | — |
+| `self-guarded-assertion` | The assertion is inside an `if` that its own subject makes false | ✅ | ✅ | — | — |
+| `optional-assertion` | The assertion only runs on some branches, so passing proves nothing | ✅ | ✅ | ✅ | ✅ |
 
 Findings are graded `critical` / `high` / `medium` / `low`.
 
@@ -54,18 +54,20 @@ part of a suite describes only that part.
 | Language / framework | Status | Notes |
 |---|---|---|
 | Python — pytest, unittest | ✅ Supported | Full `ast` analysis |
-| Python — Playwright, Selenium | ✅ Supported | These are ordinary Python; the E2E rules (`sleep-instead-of-wait`, `forced-interaction`) target them directly |
+| Python — Playwright, Selenium | ✅ Supported | Ordinary Python; the E2E rules (`sleep-instead-of-wait`, `forced-interaction`) target them directly |
 | JavaScript / TypeScript — Jest, Vitest, Cypress, Playwright | ✅ Supported | See the patterns below |
-| Java — JUnit, TestNG, Selenium | ❌ Not yet | Needs a Java parser |
+| Java — JUnit 4/5, TestNG, Selenium | ✅ Supported | `@Test`, `@ParameterizedTest`, `@RepeatedTest`; understands that `AssertionError` is an `Error`, so `catch (Exception e)` is not treated as swallowing |
+| Robot Framework | ✅ Supported | `.robot` and `.resource`; user keywords are resolved transitively, so a test whose only step is `Verify Dashboard` is judged by what that keyword does |
 | C# — NUnit, xUnit, SpecFlow | ❌ Not yet | |
-| Robot Framework | ❌ Not yet | `.robot` is keyword-driven and tabular; needs its own parser, not a general-purpose one |
 | Go — `testing` | ❌ Not yet | |
+| Kotlin — JUnit, Kotest | ❌ Not yet | |
 
 TypeScript needs no separate support — it is handled by the JavaScript
 detector, including `.spec.ts` and `.test.tsx`.
 
-Selenium is a library, not a language: a Selenium suite written in Python or
-JavaScript is already covered, while one written in Java or C# is not.
+Selenium is a library, not a language, so it is covered wherever its host
+language is: Python, JavaScript/TypeScript and Java suites are all analyzed
+today. A Selenium suite written in C# is not yet.
 
 ### Which files are picked up
 
@@ -73,6 +75,8 @@ JavaScript is already covered, while one written in Java or C# is not.
 test_*.py   *_test.py   *Test*.py   *_Playwright.py   *.spec.py   tests/**/*.py
 *.spec.{js,jsx,ts,tsx}   *.test.{js,jsx,ts,tsx}   *.cy.{js,ts}
 tests/**/*.{js,ts}   e2e/**/*.{js,ts}   __tests__/**/*.{js,ts}
+*.robot   *.resource
+*Test.java   *Tests.java   Test*.java   *IT.java   *TestCase.java   src/test/java/**/*.java
 ```
 
 Always skipped: `node_modules`, `.venv`, `venv`, `__pycache__`, `build`,
@@ -98,7 +102,9 @@ Browser ──▶ FastAPI (app/main.py)
                │                  └─▶ git sparse-checkout  (test files only)
                │
                ├─▶ falsegreen engine ─▶ detectors/python_ast.py  (ast.parse)
-               │                     └─▶ detectors/javascript.py (source scan)
+               │                     ├─▶ detectors/javascript.py (source scan)
+               │                     ├─▶ detectors/java.py       (source scan)
+               │                     └─▶ detectors/robot.py      (keyword scan)
                │
                └─▶ app/store.py ──▶ SQLite (cache, rate limit, waitlist)
 ```
@@ -136,8 +142,8 @@ back end.
    230 MB repository typically costs about 1 MB and two seconds.
 4. **Collect and measure.** Matching files are listed and their combined size
    checked against the ceiling.
-5. **Analyze.** Each file is dispatched by extension to the Python or the
-   JavaScript detector. Nothing is executed.
+5. **Analyze.** Each file is dispatched by extension to the Python,
+   JavaScript, Java or Robot Framework detector. Nothing is executed.
 6. **Score and store.** The Trust Score is computed, the report is cached for
    six hours, and the page is rendered.
 

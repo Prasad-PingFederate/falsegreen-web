@@ -20,7 +20,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # a stranger's code into this image while providing none of the imports
 # app/scanner.py needs - the container could not have started. A commit SHA is
 # used rather than a tag or branch because only the SHA is immutable.
-RUN pip install --no-cache-dir     "falsegreen @ git+https://github.com/Prasad-PingFederate/falsegreen@efed24bd89e4ecc8bd9f34042581987de03dcc90"
+RUN pip install --no-cache-dir     "falsegreen @ git+https://github.com/Prasad-PingFederate/falsegreen@90013e44b203cd6a10495db73b7378a2b7d48b2a"
 
 COPY app ./app
 COPY static ./static

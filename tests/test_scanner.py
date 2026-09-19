@@ -90,6 +90,43 @@ def test_python_and_javascript_are_analyzed_in_one_pass(tmp_path: Path):
     assert files_with_findings == {"login.spec.ts", "test_api.py"}
 
 
+ROBOT_TEST_NO_ASSERTION = """*** Test Cases ***
+Drive And Hope
+    Open Browser    ${URL}    chrome
+    Click Button    Login
+"""
+
+
+def test_robot_suites_are_analyzed(tmp_path: Path):
+    """.robot goes to the Robot detector, not to ast.parse.
+
+    Robot is the third language in the dispatch, and the one most likely to be
+    forgotten when the chain is edited - it is checked last and shares no
+    extension with the others.
+    """
+    suite = tmp_path / "login.robot"
+    suite.write_text(ROBOT_TEST_NO_ASSERTION, encoding="utf-8")
+
+    result = analyze([suite], tmp_path)
+
+    assert result.files_scanned == 1
+    assert result.errors == []
+    assert any(f.rule.value == "no-assertions" for f in result.findings)
+
+
+def test_all_three_languages_survive_one_pass(tmp_path: Path):
+    """Python, JavaScript and Robot in a single repository."""
+    (tmp_path / "login.spec.ts").write_text(JS_TEST_NO_ASSERTION, encoding="utf-8")
+    (tmp_path / "test_api.py").write_text(PY_TEST_SWALLOWED, encoding="utf-8")
+    (tmp_path / "suite.robot").write_text(ROBOT_TEST_NO_ASSERTION, encoding="utf-8")
+
+    files = [tmp_path / n for n in ("login.spec.ts", "test_api.py", "suite.robot")]
+    result = analyze(files, tmp_path)
+
+    assert result.files_scanned == 3
+    assert result.errors == []
+
+
 @pytest.mark.parametrize("name", ["a.spec.ts", "a.spec.js", "a.test.tsx", "a.cy.ts"])
 def test_every_javascript_extension_reaches_the_js_analyzer(tmp_path: Path, name: str):
     """The dispatch keys off JS_EXTENSIONS, so each spelling must work."""
